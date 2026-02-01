@@ -12,7 +12,22 @@
     <meta name="apple-mobile-web-app-title" content="GymPro">
     
     <title>Gym Tracker Pro</title>
-    
+
+    <!-- CSS PENTRU ASCUNDERE SCROLLBAR -->
+    <style>
+        /* Regula se aplica doar pe ecrane mai mici de 768px (Mobile) */
+        @media (max-width: 768px) {
+            /* Ascunde scrollbar pentru Chrome, Safari si Opera */
+            .no-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+            /* Ascunde scrollbar pentru IE, Edge si Firefox */
+            .no-scrollbar {
+                -ms-overflow-style: none;  /* IE si Edge */
+                scrollbar-width: none;  /* Firefox */
+            }
+        }
+    </style>
     <!-- PWA Manifest Generator (Pentru Android Fullscreen) -->
     <script>
         const manifest = {
