@@ -797,10 +797,15 @@
                                             <button 
                                                 key={ex.id}
                                                 onClick={() => { setSelectedExerciseId(ex.id); setViewWeekOffset(0); }}
-                                                className={`snap-center shrink-0 px-5 py-3 rounded-2xl border transition-all text-left min-w-[140px] flex flex-col gap-1 ${selectedExerciseId === ex.id ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 dark:border-indigo-400 ring-1 ring-indigo-500' : 'border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-800 hover:border-zinc-300'}`}
+                                                className={`snap-start shrink-0 w-[calc((100%-1.5rem)/3)] px-3 py-2 rounded-full border transition-all text-center flex flex-col items-center justify-center gap-1 shadow-sm ${
+                                                    selectedExerciseId === ex.id 
+                                                    ? 'border-zinc-900 bg-zinc-900 text-white dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-900' 
+                                                    : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700'
+                                                }`}
                                             >
-                                                <span className={`text-sm font-bold truncate w-full ${selectedExerciseId === ex.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-zinc-700 dark:text-zinc-300'}`}>{ex.name}</span>
-                                                <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">{ex.targetReps} Reps</span>
+                                                <span className="text-xs font-semibold truncate w-full">
+                                                    {ex.name}
+                                                </span>
                                             </button>
                                         ))
                                     )}
