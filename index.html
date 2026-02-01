@@ -15,16 +15,43 @@
 
     <!-- CSS PENTRU ASCUNDERE SCROLLBAR -->
     <style>
-        /* Regula se aplica doar pe ecrane mai mici de 768px (Mobile) */
+        /* 1. MOBILE: Ascundem complet scrollbar-ul sub 768px */
         @media (max-width: 768px) {
-            /* Ascunde scrollbar pentru Chrome, Safari si Opera */
-            .no-scrollbar::-webkit-scrollbar {
-                display: none;
+            /* Se aplică pe tot site-ul (html/body) și pe orice element cu scroll */
+            *::-webkit-scrollbar {
+                display: none !important;
             }
-            /* Ascunde scrollbar pentru IE, Edge si Firefox */
-            .no-scrollbar {
-                -ms-overflow-style: none;  /* IE si Edge */
-                scrollbar-width: none;  /* Firefox */
+            * {
+                -ms-overflow-style: none !important;
+                scrollbar-width: none !important;
+            }
+        }
+    
+        /* 2. DESKTOP: Linia subțire peste 768px */
+        @media (min-width: 769px) {
+            /* Pentru Chrome, Safari, Edge, Brave */
+            ::-webkit-scrollbar {
+                width: 4px !important;  /* Linie verticală subțire */
+                height: 4px !important; /* Linie orizontală subțire */
+            }
+    
+            ::-webkit-scrollbar-track {
+                background: transparent !important; /* Fără fundal */
+            }
+    
+            ::-webkit-scrollbar-thumb {
+                background-color: rgba(136, 136, 136, 0.5) !important; /* Gri semi-transparent */
+                border-radius: 10px !important;
+            }
+    
+            ::-webkit-scrollbar-thumb:hover {
+                background-color: #555 !important; /* Se închide la hover */
+            }
+    
+            /* Pentru Firefox */
+            * {
+                scrollbar-width: thin !important;
+                scrollbar-color: rgba(136, 136, 136, 0.5) transparent !important;
             }
         }
     </style>
