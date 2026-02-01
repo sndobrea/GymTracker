@@ -2,16 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym Tracker Pro</title>
     <link rel="icon" href="https://img.icons8.com/fluency/96/dumbbell.png" type="image/png">
+    <!-- Viewport optimizat pentru aplicatii mobile (fara zoom) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- iOS Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GymPro">
+    
+    <title>Gym Tracker Pro</title>
+    
+    <!-- PWA Manifest Generator (Pentru Android Fullscreen) -->
+    <script>
+        const manifest = {
+            "name": "Gym Tracker Pro",
+            "short_name": "GymPro",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#09090b",
+            "theme_color": "#09090b",
+            "icons": [
+                {
+                    "src": "https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/dumbbell.svg",
+                    "sizes": "192x192",
+                    "type": "image/svg+xml"
+                },
+                {
+                    "src": "https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/dumbbell.svg",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+    </script>
+
     <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
-                extend: {},
+                extend: {
+                    // Safe area padding for iPhones with notch
+                    spacing: {
+                        'safe-top': 'env(safe-area-inset-top)',
+                        'safe-bottom': 'env(safe-area-inset-bottom)',
+                    }
+                },
             },
         }
     </script>
@@ -624,7 +669,7 @@
             }, [selectedExercise, settings, history, selectedExerciseId]); // Re-calc on history change
 
             return (
-                <div className={`min-h-screen font-sans pb-20 ${theme === 'dark' ? 'bg-zinc-950 text-zinc-50' : 'bg-zinc-50 text-zinc-900'}`}>
+                <div className={`min-h-screen font-sans pb-20 safe-bottom ${theme === 'dark' ? 'bg-zinc-950 text-zinc-50' : 'bg-zinc-50 text-zinc-900'}`}>
                     {notification && <ToastNotification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
                     <Modal isOpen={!!importModalData} onClose={() => setImportModalData(null)} title="Confirm Import" footer={<><Button variant="ghost" onClick={() => setImportModalData(null)}>Cancel</Button><Button onClick={confirmImport}>Yes, Overwrite</Button></>}>
                         <div className="flex flex-col gap-3">
@@ -633,7 +678,7 @@
                         </div>
                     </Modal>
 
-                    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/90">
+                    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/90 safe-top">
                         <div className="container mx-auto flex h-16 items-center justify-between px-4 max-w-2xl">
                             <div className="flex items-center gap-2">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"><Icons.Activity className="h-5 w-5" /></div>
@@ -683,6 +728,7 @@
                             <div className="sm:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 absolute w-full left-0 px-4 py-4 shadow-xl flex flex-col gap-2">
                                 <button onClick={() => { setActiveTab('tracker'); setIsMenuOpen(false); }} className={`p-3 rounded-lg text-left font-medium ${activeTab === 'tracker' ? 'bg-zinc-100 dark:bg-zinc-900' : ''}`}>Workout Tracker</button>
                                 <button onClick={() => { setActiveTab('config'); setIsMenuOpen(false); }} className={`p-3 rounded-lg text-left font-medium ${activeTab === 'config' ? 'bg-zinc-100 dark:bg-zinc-900' : ''}`}>Settings & Database</button>
+                                
                             </div>
                         )}
                         <div className="hidden sm:block container mx-auto px-4 pb-0 max-w-2xl">
