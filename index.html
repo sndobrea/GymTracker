@@ -724,10 +724,32 @@
                             </div>
                         </div>
                         {isMenuOpen && (
-                            <div className="sm:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 absolute w-full left-0 px-4 py-4 shadow-xl flex flex-col gap-2">
-                                <button onClick={() => { setActiveTab('tracker'); setIsMenuOpen(false); }} className={`p-3 rounded-lg text-left font-medium ${activeTab === 'tracker' ? 'bg-zinc-100 dark:bg-zinc-900' : ''}`}>Workout Tracker</button>
-                                <button onClick={() => { setActiveTab('config'); setIsMenuOpen(false); }} className={`p-3 rounded-lg text-left font-medium ${activeTab === 'config' ? 'bg-zinc-100 dark:bg-zinc-900' : ''}`}>Settings & Database</button>
+                            <div className="sm:hidden absolute w-full left-0 px-4 py-4 shadow-xl flex flex-col gap-2
+                                border-t border-zinc-200 dark:border-zinc-800
+                                border-b-2 border-b-zinc-900 dark:border-b-zinc-100
+                                bg-zinc-50 dark:bg-zinc-900"
+                            >
+                                <button 
+                                    onClick={() => { setActiveTab('tracker'); setIsMenuOpen(false); }} 
+                                    className={`p-3 rounded-lg text-left font-medium transition-colors ${
+                                        activeTab === 'tracker' 
+                                        ? 'bg-zinc-200 dark:bg-zinc-800' // Am ajustat putin si starea activa sa se vada pe noul fundal
+                                        : 'hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'
+                                    }`}
+                                >
+                                    Workout Tracker
+                                </button>
                                 
+                                <button 
+                                    onClick={() => { setActiveTab('config'); setIsMenuOpen(false); }} 
+                                    className={`p-3 rounded-lg text-left font-medium transition-colors ${
+                                        activeTab === 'config' 
+                                        ? 'bg-zinc-200 dark:bg-zinc-800' 
+                                        : 'hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'
+                                    }`}
+                                >
+                                    Settings & Database
+                                </button>
                             </div>
                         )}
                         <div className="hidden sm:block container mx-auto px-4 pb-0 max-w-2xl">
