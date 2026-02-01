@@ -926,9 +926,9 @@
                                                                 const currentReps = sessionData.reps[sIdx];
                                                                 let btnColor = "bg-zinc-100 text-zinc-300 dark:bg-zinc-800 dark:text-zinc-600";
                                                                 if (isDone) {
-                                                                    if (currentReps >= 10) btnColor = "bg-red-500 text-white shadow-lg shadow-red-500/30";
-                                                                    else if (currentReps === 9) btnColor = "bg-orange-500 text-white shadow-lg shadow-orange-500/30";
-                                                                    else btnColor = "bg-green-500 text-white shadow-lg shadow-green-500/30";
+                                                                    if (currentReps >= 10) btnColor = "bg-red-600 text-white shadow-lg shadow-red-600/30";
+                                                                    else if (currentReps === 9) btnColor = "bg-amber-600  text-white shadow-lg shadow-amber-600/30";
+                                                                    else btnColor = "bg-lime-600  text-white shadow-lg shadow-lime-600/30";
                                                                 }
 
                                                                 return (
@@ -937,7 +937,7 @@
                                                                         <div className="flex items-baseline gap-1">
                                                                             <span className={`text-2xl font-black tracking-tighter ${
                                                                                 isDone 
-                                                                                ? (currentReps >= 10 ? 'text-red-500' : currentReps === 9 ? 'text-orange-500' : 'text-green-500') 
+                                                                                ? (currentReps >= 10 ? 'text-red-600' : currentReps === 9 ? 'text-amber-600' : 'text-lime-600') 
                                                                                 : 'text-zinc-900 dark:text-zinc-100'
                                                                             }`}>
                                                                                 {currentReps}
@@ -946,7 +946,7 @@
                                                                         </div>
                                                                         <button 
                                                                             onClick={() => toggleSetComplete(displayedWeekIndex, wIdx, sIdx)} 
-                                                                            className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${btnColor}`}
+                                                                            className={`h-6 w-6 rounded-full flex items-center justify-center transition-all ${btnColor}`}
                                                                         >
                                                                             <Icons.CheckCircle2 className={`h-5 w-5 ${isDone ? 'stroke-[3px]' : ''}`} />
                                                                         </button>
