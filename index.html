@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gym Tracker Pro</title>
-    
+    <link rel="icon" href="https://img.icons8.com/fluency/96/dumbbell.png" type="image/png">
     <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -382,6 +382,7 @@
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
             const [showSyncModal, setShowSyncModal] = useState(false);
+            const [showUserMenu, setShowUserMenu] = useState(false); // NEW STATE FOR USER DROPDOWN
             const [loginEmail, setLoginEmail] = useState('');
             const [loginPass, setLoginPass] = useState('');
             
@@ -437,6 +438,17 @@
                 localStorage.setItem('theme', theme);
             }, [theme]);
 
+            // CLOSE DROPDOWN WHEN CLICKING OUTSIDE
+            useEffect(() => {
+                const closeMenu = (e) => {
+                    if (showUserMenu && !e.target.closest('.user-menu-container')) {
+                        setShowUserMenu(false);
+                    }
+                };
+                document.addEventListener('click', closeMenu);
+                return () => document.removeEventListener('click', closeMenu);
+            }, [showUserMenu]);
+
             const persistData = (newSettings, newExercises, newHistory) => {
                 const s = newSettings || settings;
                 const e = newExercises || exercises;
@@ -467,7 +479,6 @@
                 persistData({ ...settings, workoutNames: newNames }, null, null);
             };
 
-            // FIX: BUTTON DELETE
             const removeRoutine = (index) => {
                 if (settings.workoutNames.length <= 1) {
                     setNotification({ message: "Must have at least one routine.", type: "error" });
@@ -629,7 +640,41 @@
                                 <span className="text-lg font-bold tracking-tight">Gym<span className="opacity-50">Pro</span></span>
                             </div>
                             <div className="flex items-center gap-3">
-                                {user ? <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-full"><Icons.User className="h-4 w-4 text-green-500" /><span className="text-xs font-bold hidden sm:block">Logged In</span></div> : <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-1 text-sm font-medium hover:text-indigo-500"><Icons.LogIn className="h-4 w-4" /> Login</button>}
+                                {/* UPDATED USER MENU DROPDOWN */}
+                                {user ? (
+                                    <div className="relative user-menu-container">
+                                        <button 
+                                            onClick={() => setShowUserMenu(!showUserMenu)}
+                                            className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+                                        >
+                                            <Icons.User className="h-4 w-4 text-green-500" />
+                                            <span className="text-xs font-bold hidden sm:block">Logged In</span>
+                                            <Icons.ChevronDown className={`h-3 w-3 opacity-50 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        
+                                        {showUserMenu && (
+                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden z-50 animate-[fadeIn_0.1s_ease-out]">
+                                                <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50">
+                                                    <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold mb-0.5">Account</p>
+                                                    <p className="text-xs font-medium truncate" title={user.email}>{user.email}</p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => {
+                                                        window.logout();
+                                                        setShowUserMenu(false);
+                                                    }}
+                                                    className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-2 transition-colors"
+                                                >
+                                                    <Icons.LogOut className="h-4 w-4" />
+                                                    Sign Out
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-1 text-sm font-medium hover:text-indigo-500"><Icons.LogIn className="h-4 w-4" /> Login</button>
+                                )}
+
                                 <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">{theme === 'dark' ? <Icons.Sun className="h-5 w-5" /> : <Icons.Moon className="h-5 w-5" />}</button>
                                 <button className="sm:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>{isMenuOpen ? <Icons.X className="h-6 w-6" /> : <Icons.Menu className="h-6 w-6" />}</button>
                             </div>
@@ -755,6 +800,7 @@
                                                 className={`snap-center shrink-0 px-5 py-3 rounded-2xl border transition-all text-left min-w-[140px] flex flex-col gap-1 ${selectedExerciseId === ex.id ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 dark:border-indigo-400 ring-1 ring-indigo-500' : 'border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-800 hover:border-zinc-300'}`}
                                             >
                                                 <span className={`text-sm font-bold truncate w-full ${selectedExerciseId === ex.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-zinc-700 dark:text-zinc-300'}`}>{ex.name}</span>
+                                                <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">{ex.targetReps} Reps</span>
                                             </button>
                                         ))
                                     )}
