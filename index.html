@@ -923,14 +923,31 @@
                                                         <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                                                             {setsArray.map((_, sIdx) => {
                                                                 const isDone = history[selectedExerciseId]?.[displayedWeekIndex]?.[wIdx]?.[sIdx];
+                                                                const currentReps = sessionData.reps[sIdx];
+                                                                let btnColor = "bg-zinc-100 text-zinc-300 dark:bg-zinc-800 dark:text-zinc-600";
+                                                                if (isDone) {
+                                                                    if (currentReps >= 10) btnColor = "bg-red-500 text-white shadow-lg shadow-red-500/30";
+                                                                    else if (currentReps === 9) btnColor = "bg-orange-500 text-white shadow-lg shadow-orange-500/30";
+                                                                    else btnColor = "bg-green-500 text-white shadow-lg shadow-green-500/30";
+                                                                }
+
                                                                 return (
-                                                                    <div key={sIdx} className={`flex items-center justify-between px-5 py-3 ${isDone ? 'bg-green-50/50 dark:bg-green-900/10' : ''}`}>
+                                                                    <div key={sIdx} className={`flex items-center justify-between px-5 py-3 ${isDone ? 'bg-zinc-50 dark:bg-zinc-900/30' : ''}`}>
                                                                         <span className="text-xs font-bold text-zinc-400 w-8">#{sIdx+1}</span>
                                                                         <div className="flex items-baseline gap-1">
-                                                                            <span className={`text-2xl font-black tracking-tighter ${isDone ? 'text-green-600 dark:text-green-400' : ''}`}>{sessionData.reps[sIdx]}</span>
+                                                                            <span className={`text-2xl font-black tracking-tighter ${
+                                                                                isDone 
+                                                                                ? (currentReps >= 10 ? 'text-red-500' : currentReps === 9 ? 'text-orange-500' : 'text-green-500') 
+                                                                                : 'text-zinc-900 dark:text-zinc-100'
+                                                                            }`}>
+                                                                                {currentReps}
+                                                                            </span>
                                                                             <span className="text-[10px] font-bold uppercase text-zinc-400">reps</span>
                                                                         </div>
-                                                                        <button onClick={() => toggleSetComplete(displayedWeekIndex, wIdx, sIdx)} className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${isDone ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : 'bg-zinc-100 text-zinc-300 dark:bg-zinc-800 dark:text-zinc-600'}`}>
+                                                                        <button 
+                                                                            onClick={() => toggleSetComplete(displayedWeekIndex, wIdx, sIdx)} 
+                                                                            className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${btnColor}`}
+                                                                        >
                                                                             <Icons.CheckCircle2 className={`h-5 w-5 ${isDone ? 'stroke-[3px]' : ''}`} />
                                                                         </button>
                                                                     </div>
