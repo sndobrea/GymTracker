@@ -1155,12 +1155,6 @@
                     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-2xl border border-zinc-800 dark:border-zinc-200 animate-[slideIn_0.3s_ease-out] timer-active">
                         <Icons.Timer className="h-5 w-5 animate-pulse" />
                         <span className="text-xl font-black tabular-nums tracking-wider">{formatTime(restTimer)}</span>
-                        <button 
-                            onClick={() => { setTimerActive(false); setRestTimer(0); }}
-                            className="ml-2 p-1 rounded-full hover:bg-white/20 dark:hover:bg-black/10"
-                        >
-                            <Icons.X className="h-4 w-4" />
-                        </button>
                     </div>
                 )}
                 </div>
