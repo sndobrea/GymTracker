@@ -401,7 +401,7 @@
             return Math.floor(diff / (1000 * 60 * 60 * 24 * 7));
         };
 
-        // --- 1. NEW FIXED CALCULATION LOGIC (VIRTUAL GAIN) ---
+
         const calculateProgression = (ex, settings, weekIdx, workoutIdx) => {
             if (!ex || !settings) return null;
             const startW = parseFloat(ex.currentWeight) || 0;
@@ -413,38 +413,42 @@
             const totalSessions = parseInt(settings.totalWeeks) * parseInt(settings.workoutsPerWeek);
             let sessionIdx = (weekIdx * parseInt(settings.workoutsPerWeek)) + workoutIdx;
             
-            // Safety: Negative session or Future session beyond plan
             if (sessionIdx < 0) sessionIdx = 0;
-            
-            // If goal achieved/invalid
             if (endW <= startW) return { weight: startW, reps: Array(sets).fill(tReps) };
 
-            // VIRTUAL GAIN LOGIC: 
-            // We map the timeline not just to "endW", but to "endW + step".
-            // This forces the "endW" plateau to start earlier and finish exactly at the last session.
             const virtualGain = (endW - startW) + step;
-            
-            // Linear progression through the VIRTUAL range
             const progressRatio = sessionIdx / (totalSessions > 1 ? totalSessions - 1 : 1);
-            
-            // Current virtual value
             const virtualValue = startW + (progressRatio * virtualGain);
             
-            // Determine Weight: Snap to lower step
-            // We use Math.min(endW) to clamp it so it never shows weight > target
-            let weight = Math.min(endW, Math.floor(virtualValue / step) * step);
+            // KEY FIX: Calculate steps RELATIVE to START WEIGHT
+            const gainedWeight = virtualValue - startW;
+            const quantizedGain = Math.floor(gainedWeight / step) * step;
+            let weight = Math.min(endW, startW + quantizedGain);
             
-            // Determine Reps: Based on how far we are into the current weight step
-            // remainder is 0.0 -> 0.999... of a step
             let remainder = (virtualValue - weight);
-            
-            // If we are clamped at endW, we might have overflowed in virtualValue, 
-            // so we calculate remainder based on the final rep build-up.
             if (weight >= endW) {
-                // Remainder is simply how close we are to "endW + step"
-                // Recalculate linear pos relative to [endW, endW+step]
                 remainder = virtualValue - endW;
             }
+
+            let progressInStep = remainder / step;
+            if (progressInStep > 1) progressInStep = 1;
+            if (progressInStep < 0) progressInStep = 0;
+
+            const minReps = Math.max(1, tReps - 2);
+            const minVol = sets * minReps;
+            const maxVol = sets * tReps;
+            const currentVol = Math.round(minVol + (progressInStep * (maxVol - minVol)));
+            
+            const reps = Array(sets).fill(0);
+            let remVol = currentVol;
+            for(let i=0; i<sets; i++) {
+                let val = Math.ceil(remVol / (sets - i));
+                if (val > tReps) val = tReps; 
+                reps[i] = val;
+                remVol -= val;
+            }
+            return { weight, reps };
+        };
 
             // progressInStep (0.0 to 1.0)
             let progressInStep = remainder / step;
@@ -747,7 +751,7 @@
                 if (!selectedExercise) return null;
                 const gain = selectedExercise.targetWeight - selectedExercise.currentWeight;
                 const step = selectedExercise.increment > 0 ? selectedExercise.increment : 1;
-                const steps = Math.ceil(gain / step);
+                const steps = Math.ceil(gain / step) + 1;
                 const weeksPerInc = steps > 0 ? (settings.totalWeeks / steps).toFixed(1) : 0;
                 
                 // Real Progress Logic: Count checked sets vs Total sets needed
