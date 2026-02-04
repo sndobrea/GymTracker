@@ -450,32 +450,6 @@
             return { weight, reps };
         };
 
-            // progressInStep (0.0 to 1.0)
-            let progressInStep = remainder / step;
-            if (progressInStep > 1) progressInStep = 1;
-            if (progressInStep < 0) progressInStep = 0;
-
-            const minReps = Math.max(1, tReps - 2);
-            
-            // Calculate total volume for the sets (e.g. 3 sets)
-            // Interpolate between [minReps * sets] and [targetReps * sets]
-            const minVol = sets * minReps;
-            const maxVol = sets * tReps;
-            const currentVol = Math.round(minVol + (progressInStep * (maxVol - minVol)));
-            
-            // Distribute volume
-            const reps = Array(sets).fill(0);
-            let remVol = currentVol;
-            for(let i=0; i<sets; i++) {
-                // Distribute evenly (front load slightly if needed)
-                let val = Math.ceil(remVol / (sets - i));
-                if (val > tReps) val = tReps; // Cap at max reps
-                reps[i] = val;
-                remVol -= val;
-            }
-            return { weight, reps };
-        };
-
         // --- MAIN APP ---
         function GymTrackerApp() {
         // Base 64 simple beep sound
