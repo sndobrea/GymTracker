@@ -201,6 +201,7 @@
             Minus: (p) => <Icon name="minus" {...p} />,
             ChevronLeft: (p) => <Icon name="chevron-left" {...p} />,
             ChevronRight: (p) => <Icon name="chevron-right" {...p} />,
+            ChevronUp: (p) => <Icon name="chevron-up" {...p} />,
             Trash2: (p) => <Icon name="trash-2" {...p} />,
             Edit2: (p) => <Icon name="pencil" {...p} />, 
             Dumbbell: (p) => <Icon name="dumbbell" {...p} />,
@@ -602,14 +603,51 @@
                 document.addEventListener(isTouch ? 'touchend' : 'mouseup', onDragEnd);
             };
 
+            const runAutoSelect = (currentSettings, currentHistory) => {
+                if (!currentSettings || !currentSettings.workoutNames || currentSettings.workoutNames.length === 0) return;
+                const workoutsCount = parseInt(currentSettings.workoutsPerWeek) || 0;
+                const currentWeekIdx = getWeekNumber(currentSettings.startDate);
+                
+                let foundWorkoutIdx = -1;
+                for (let sIdx = 0; sIdx < workoutsCount; sIdx++) {
+                    for (let rIdx = 0; rIdx < currentSettings.workoutNames.length; rIdx++) {
+                        const sessionHistory = currentHistory["_sessions"]?.[rIdx]?.[currentWeekIdx];
+                        const isCompleted = sessionHistory?.[sIdx] === true;
+                        if (!isCompleted) {
+                            foundWorkoutIdx = rIdx;
+                            break;
+                        }
+                    }
+                    if (foundWorkoutIdx !== -1) break;
+                }
+                
+                if (foundWorkoutIdx !== -1) {
+                    setFilterWorkoutIndex(foundWorkoutIdx);
+                } else {
+                    setFilterWorkoutIndex(0);
+                }
+            };
+
             useEffect(() => {
                 if (localStorage.getItem('theme') === 'light') setTheme('light');
                 const savedSettings = localStorage.getItem('gym_settings_v3');
                 const savedExercises = localStorage.getItem('gym_exercises_v3');
                 const savedHistory = localStorage.getItem('gym_history_v3');
-                if (savedSettings) setSettings(JSON.parse(savedSettings));
+                
+                let initialSettings = settings;
+                let initialHistory = history;
+                
+                if (savedSettings) {
+                    initialSettings = JSON.parse(savedSettings);
+                    setSettings(initialSettings);
+                }
                 if (savedExercises) setExercises(JSON.parse(savedExercises));
-                if (savedHistory) setHistory(JSON.parse(savedHistory));
+                if (savedHistory) {
+                    initialHistory = JSON.parse(savedHistory);
+                    setHistory(initialHistory);
+                }
+                
+                runAutoSelect(initialSettings, initialHistory);
 
                 if (window.auth) {
                     const unsubscribe = window.auth.onAuthStateChanged(async (currentUser) => {
@@ -661,6 +699,7 @@
                 localStorage.setItem('gym_settings_v3', JSON.stringify(data.settings));
                 localStorage.setItem('gym_exercises_v3', JSON.stringify(data.exercises));
                 localStorage.setItem('gym_history_v3', JSON.stringify(data.history));
+                runAutoSelect(data.settings || settings, data.history || history);
             };
 
             const handleLogin = async (e) => { e.preventDefault(); try { await window.loginEmail(loginEmail, loginPass); setShowLoginModal(false); } catch (err) { alert("Login failed: " + err.message); } };
@@ -677,8 +716,102 @@
                     setNotification({ message: "Must have at least one routine.", type: "error" });
                     return;
                 }
+                
                 const newNames = settings.workoutNames.filter((_, i) => i !== index);
-                persistData({ ...settings, workoutNames: newNames }, null, null);
+                
+                // Adjust exercises assignedWorkout
+                const newExercises = exercises.map(ex => {
+                    let assigned = ex.assignedWorkout || 0;
+                    if (assigned === index) {
+                        return { ...ex, assignedWorkout: 0 };
+                    } else if (assigned > index) {
+                        return { ...ex, assignedWorkout: assigned - 1 };
+                    }
+                    return ex;
+                });
+                
+                // Adjust session history
+                const newHistory = { ...history };
+                if (newHistory["_sessions"]) {
+                    const newSessions = {};
+                    Object.keys(newHistory["_sessions"]).forEach(key => {
+                        const rIdx = parseInt(key);
+                        if (rIdx === index) {
+                            return;
+                        } else if (rIdx > index) {
+                            newSessions[rIdx - 1] = newHistory["_sessions"][key];
+                        } else {
+                            newSessions[rIdx] = newHistory["_sessions"][key];
+                        }
+                    });
+                    newHistory["_sessions"] = newSessions;
+                }
+                
+                // Update filterWorkoutIndex if it became out of bounds or points to removed routine
+                if (filterWorkoutIndex >= newNames.length) {
+                    setFilterWorkoutIndex(0);
+                } else if (filterWorkoutIndex === index) {
+                    setFilterWorkoutIndex(0);
+                } else if (filterWorkoutIndex > index) {
+                    setFilterWorkoutIndex(filterWorkoutIndex - 1);
+                }
+                
+                persistData({ ...settings, workoutNames: newNames }, newExercises, newHistory);
+                setNotification({ message: 'Routine removed successfully!', type: 'success' });
+            };
+
+            const moveRoutine = (index, direction) => {
+                const targetIndex = index + direction;
+                if (targetIndex < 0 || targetIndex >= settings.workoutNames.length) return;
+                
+                // Swap names in settings
+                const newNames = [...settings.workoutNames];
+                const tempName = newNames[index];
+                newNames[index] = newNames[targetIndex];
+                newNames[targetIndex] = tempName;
+                
+                // Swap assignedWorkout index for all exercises
+                const newExercises = exercises.map(ex => {
+                    let assigned = ex.assignedWorkout || 0;
+                    if (assigned === index) {
+                        return { ...ex, assignedWorkout: targetIndex };
+                    } else if (assigned === targetIndex) {
+                        return { ...ex, assignedWorkout: index };
+                    }
+                    return ex;
+                });
+                
+                // Swap session history in history["_sessions"]
+                const newHistory = { ...history };
+                if (newHistory["_sessions"]) {
+                    const newSessions = { ...newHistory["_sessions"] };
+                    const sessionIndexVal = newSessions[index];
+                    const sessionTargetVal = newSessions[targetIndex];
+                    
+                    if (sessionIndexVal !== undefined) {
+                        newSessions[targetIndex] = sessionIndexVal;
+                    } else {
+                        delete newSessions[targetIndex];
+                    }
+                    
+                    if (sessionTargetVal !== undefined) {
+                        newSessions[index] = sessionTargetVal;
+                    } else {
+                        delete newSessions[index];
+                    }
+                    
+                    newHistory["_sessions"] = newSessions;
+                }
+                
+                // Update selected workout index if it was one of the swapped ones
+                if (filterWorkoutIndex === index) {
+                    setFilterWorkoutIndex(targetIndex);
+                } else if (filterWorkoutIndex === targetIndex) {
+                    setFilterWorkoutIndex(index);
+                }
+                
+                persistData({ ...settings, workoutNames: newNames }, newExercises, newHistory);
+                setNotification({ message: 'Routine order updated!', type: 'success' });
             };
 
             const updateRoutineName = (index, val) => {
@@ -784,6 +917,7 @@
             const confirmImport = () => {
                 if (!importModalData) return;
                 persistData(importModalData.settings, importModalData.exercises, importModalData.history || {});
+                runAutoSelect(importModalData.settings, importModalData.history || {});
                 setImportModalData(null); 
                 setNotification({ message: 'Data imported successfully!', type: 'success' });
             };
@@ -1029,9 +1163,29 @@
                                         <div className="flex justify-between items-center"><h4 className="text-sm font-bold">Workout Routines</h4><button onClick={addRoutine} className="p-1 hover:bg-zinc-100 rounded dark:hover:bg-zinc-800"><Icons.Plus className="h-4 w-4" /></button></div>
                                         <div className="space-y-2">
                                             {settings.workoutNames.map((name, idx) => (
-                                                <div key={idx} className="flex gap-2">
-                                                    <Input value={name} onChange={(e) => updateRoutineName(idx, e.target.value)} placeholder={`Routine ${idx + 1}`} />
-                                                    <Button variant="ghost" onClick={() => removeRoutine(idx)} className="text-red-500"><Icons.Trash2 className="h-4 w-4" /></Button>
+                                                <div key={idx} className="flex gap-2 items-center">
+                                                    <Input value={name} onChange={(e) => updateRoutineName(idx, e.target.value)} placeholder={`Routine ${idx + 1}`} className="flex-1" />
+                                                    <div className="flex gap-0.5 shrink-0">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon"
+                                                            disabled={idx === 0} 
+                                                            onClick={() => moveRoutine(idx, -1)} 
+                                                            className="p-1 h-9 w-9 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 flex items-center justify-center"
+                                                        >
+                                                            <Icons.ChevronUp className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon"
+                                                            disabled={idx === settings.workoutNames.length - 1} 
+                                                            onClick={() => moveRoutine(idx, 1)} 
+                                                            className="p-1 h-9 w-9 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 flex items-center justify-center"
+                                                        >
+                                                            <Icons.ChevronDown className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                    <Button variant="ghost" onClick={() => removeRoutine(idx)} className="text-red-500 flex items-center justify-center p-1 h-9 w-9 shrink-0"><Icons.Trash2 className="h-4 w-4" /></Button>
                                                 </div>
                                             ))}
                                         </div>
