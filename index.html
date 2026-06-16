@@ -120,6 +120,14 @@
     
     <!-- 3. Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        Babel.registerPreset("react-classic", {
+            presets: [
+                [Babel.availablePresets["react"], { runtime: "classic" }],
+                Babel.availablePresets["env"]
+            ]
+        });
+    </script>
 
     <!-- 4. Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -167,7 +175,7 @@
 <body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react-classic">
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- ICONS ---
@@ -219,7 +227,9 @@
             LogOut: (p) => <Icon name="log-out" {...p} />,
             LogIn: (p) => <Icon name="log-in" {...p} />,
             Cloud: (p) => <Icon name="cloud" {...p} />,
-            Timer: (p) => <Icon name="timer" {...p} />
+            Timer: (p) => <Icon name="timer" {...p} />,
+            RotateCcw: (p) => <Icon name="rotate-ccw" {...p} />,
+            Award: (p) => <Icon name="award" {...p} />
         };
 
         const MUSCLE_GROUPS = [
@@ -460,13 +470,13 @@
             // --- Timer State (Adaugă asta la începutul GymTrackerApp) ---
             const [restTimer, setRestTimer] = useState(0);
             const [timerActive, setTimerActive] = useState(false);
+            const [tempPosition, setTempPosition] = useState(null);
                         
             const [user, setUser] = useState(null); 
             const [theme, setTheme] = useState('dark');
             const [activeTab, setActiveTab] = useState('tracker');
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
-            const [showSyncModal, setShowSyncModal] = useState(false);
             const [showUserMenu, setShowUserMenu] = useState(false); // NEW STATE FOR USER DROPDOWN
             const [loginEmail, setLoginEmail] = useState('');
             const [loginPass, setLoginPass] = useState('');
@@ -516,6 +526,83 @@
             }, [timerActive, restTimer]);
 
             useEffect(() => {
+                if (settings.timerPosition) {
+                    let { x, y } = settings.timerPosition;
+                    const screenWidth = window.innerWidth;
+                    const screenHeight = window.innerHeight;
+                    
+                    // Fallback element dimensions (approximate size of the timer badge)
+                    const elWidth = 180;
+                    const elHeight = 50;
+                    
+                    // Correct coordinates if they exceed current screen boundaries
+                    if (x < 0) x = 0;
+                    if (y < 0) y = 0;
+                    if (x + elWidth > screenWidth) {
+                        x = Math.max(0, screenWidth - elWidth);
+                    }
+                    if (y + elHeight > screenHeight) {
+                        y = Math.max(0, screenHeight - elHeight);
+                    }
+                    
+                    setTempPosition({ x, y });
+                } else {
+                    setTempPosition(null);
+                }
+            }, [settings.timerPosition]);
+
+            const handleDragStart = (e) => {
+                const isTouch = e.type.startsWith('touch');
+                const startX = isTouch ? e.touches[0].clientX : e.clientX;
+                const startY = isTouch ? e.touches[0].clientY : e.clientY;
+                
+                const rect = e.currentTarget.getBoundingClientRect();
+                const initialX = rect.left;
+                const initialY = rect.top;
+                
+                let currentPos = { x: initialX, y: initialY };
+                
+                const onDragMove = (moveEvent) => {
+                    if (isTouch && moveEvent.cancelable) {
+                        moveEvent.preventDefault();
+                    }
+                    const clientX = isTouch ? moveEvent.touches[0].clientX : moveEvent.clientX;
+                    const clientY = isTouch ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                    
+                    const dx = clientX - startX;
+                    const dy = clientY - startY;
+                    
+                    let newX = initialX + dx;
+                    let newY = initialY + dy;
+                    
+                    // Restrict to viewport bounds
+                    const screenWidth = window.innerWidth;
+                    const screenHeight = window.innerHeight;
+                    const elWidth = rect.width;
+                    const elHeight = rect.height;
+                    
+                    if (newX < 0) newX = 0;
+                    if (newY < 0) newY = 0;
+                    if (newX + elWidth > screenWidth) newX = screenWidth - elWidth;
+                    if (newY + elHeight > screenHeight) newY = screenHeight - elHeight;
+                    
+                    currentPos = { x: newX, y: newY };
+                    setTempPosition(currentPos);
+                };
+                
+                const onDragEnd = () => {
+                    document.removeEventListener(isTouch ? 'touchmove' : 'mousemove', onDragMove);
+                    document.removeEventListener(isTouch ? 'touchend' : 'mouseup', onDragEnd);
+                    
+                    // Persist final position in settings
+                    persistData({ ...settings, timerPosition: currentPos }, null, null);
+                };
+                
+                document.addEventListener(isTouch ? 'touchmove' : 'mousemove', onDragMove, { passive: false });
+                document.addEventListener(isTouch ? 'touchend' : 'mouseup', onDragEnd);
+            };
+
+            useEffect(() => {
                 if (localStorage.getItem('theme') === 'light') setTheme('light');
                 const savedSettings = localStorage.getItem('gym_settings_v3');
                 const savedExercises = localStorage.getItem('gym_exercises_v3');
@@ -530,9 +617,10 @@
                         if (currentUser) {
                             const cloudData = await window.getUserData(currentUser.uid);
                             if (cloudData) {
-                                if (savedExercises) setShowSyncModal(true); 
-                                else applyData(cloudData);
-                            } else syncToCloud(currentUser.uid); 
+                                applyData(cloudData);
+                            } else {
+                                syncToCloud(currentUser.uid);
+                            }
                         }
                     });
                     return () => unsubscribe();
@@ -577,7 +665,6 @@
 
             const handleLogin = async (e) => { e.preventDefault(); try { await window.loginEmail(loginEmail, loginPass); setShowLoginModal(false); } catch (err) { alert("Login failed: " + err.message); } };
             const handleGoogleLogin = async () => { try { await window.loginGoogle(); setShowLoginModal(false); } catch (err) { alert("Google Login failed: " + err.message); } };
-            const handleConfirmSync = async (useCloud) => { if (useCloud) { const cloudData = await window.getUserData(user.uid); applyData(cloudData); } else { syncToCloud(user.uid); } setShowSyncModal(false); };
 
             const addRoutine = () => {
                 const newName = `Workout ${settings.workoutNames.length + 1}`;
@@ -706,6 +793,73 @@
             const routineExercises = useMemo(() => exercises.filter(e => (e.assignedWorkout || 0) === parseInt(filterWorkoutIndex)), [exercises, filterWorkoutIndex]);
             const availableMuscleGroups = useMemo(() => { const groups = new Set(routineExercises.map(e => e.muscleGroup)); return MUSCLE_GROUPS.filter(g => groups.has(g.value)); }, [routineExercises]);
             const filteredExercises = useMemo(() => { if (filterMuscleGroup === 'all') return routineExercises; return routineExercises.filter(e => e.muscleGroup === filterMuscleGroup); }, [routineExercises, filterMuscleGroup]);
+
+            const getActiveSessionIndex = (workoutIdx) => {
+                const workoutsCount = parseInt(settings.workoutsPerWeek) || 0;
+                const weekIdx = displayedWeekIndex;
+                const sessionHistory = history["_sessions"]?.[workoutIdx]?.[weekIdx];
+                for (let wIdx = 0; wIdx < workoutsCount; wIdx++) {
+                    if (!sessionHistory || sessionHistory[wIdx] !== true) {
+                        return wIdx;
+                    }
+                }
+                return -1;
+            };
+
+            const finishSession = (wIdx) => {
+                const newHistory = { ...history };
+                if (!newHistory["_sessions"]) newHistory["_sessions"] = {};
+                if (!newHistory["_sessions"][filterWorkoutIndex]) newHistory["_sessions"][filterWorkoutIndex] = {};
+                if (!newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex]) newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex] = {};
+                
+                newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex][wIdx] = true;
+                persistData(null, null, newHistory);
+                setNotification({ message: `Session ${String.fromCharCode(65 + wIdx)} finished successfully!`, type: 'success' });
+            };
+
+            const resetSessions = () => {
+                const newHistory = { ...history };
+                if (newHistory["_sessions"]?.[filterWorkoutIndex]?.[displayedWeekIndex]) {
+                    delete newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex];
+                    persistData(null, null, newHistory);
+                    setNotification({ message: 'Sessions reset successfully!', type: 'success' });
+                }
+            };
+
+            const getExerciseCompletionStatus = (exId, weekIdx) => {
+                const sets = parseInt(settings.setsPerWorkout) || 3;
+                const activeSessionIdx = getActiveSessionIndex(filterWorkoutIndex);
+                const targetSessionIdx = activeSessionIdx === -1 
+                    ? Math.max(0, (parseInt(settings.workoutsPerWeek) || 0) - 1) 
+                    : activeSessionIdx;
+                
+                const exHistory = history[exId]?.[weekIdx]?.[targetSessionIdx];
+                if (!exHistory) return 0;
+                
+                let completedCount = 0;
+                for (let sIdx = 0; sIdx < sets; sIdx++) {
+                    if (exHistory[sIdx] === true) {
+                        completedCount++;
+                    }
+                }
+                return completedCount;
+            };
+
+            const getMuscleGroupCompletionStatus = (muscleGroup, weekIdx) => {
+                const groupExercises = routineExercises.filter(e => e.muscleGroup === muscleGroup);
+                const total = groupExercises.length;
+                if (total === 0) return { finished: 0, total: 0 };
+                
+                let finished = 0;
+                groupExercises.forEach(ex => {
+                    const completed = getExerciseCompletionStatus(ex.id, weekIdx);
+                    if (completed >= (parseInt(settings.setsPerWorkout) || 3)) {
+                        finished++;
+                    }
+                });
+                
+                return { finished, total };
+            };
 
             useEffect(() => {
                 if (activeTab === 'tracker') {
@@ -914,7 +1068,7 @@
                                                 <div className="text-xs text-zinc-500 flex flex-wrap gap-2 mt-1">
                                                     <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{settings.workoutNames[ex.assignedWorkout] || `Workout ${ex.assignedWorkout + 1}`}</span>
                                                     <span className="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 px-2 py-0.5 rounded capitalize">{ex.muscleGroup}</span>
-                                                    <span>{ex.currentWeight}kg -> {ex.targetWeight}kg</span>
+                                                    <span>{ex.currentWeight}kg &rarr; {ex.targetWeight}kg</span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1">
@@ -938,30 +1092,69 @@
 
                                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2">
                                     <button onClick={() => setFilterMuscleGroup('all')} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${filterMuscleGroup === 'all' ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-black' : 'bg-white border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800'}`}>All</button>
-                                    {availableMuscleGroups.map(g => (
-                                        <button key={g.value} onClick={() => setFilterMuscleGroup(g.value)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${filterMuscleGroup === g.value ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-black' : 'bg-white border-zinc-200 dark:bg-zinc-950 dark:text-zinc-400 dark:border-zinc-800 dark:hover:bg-zinc-900'}`}>{g.label}</button>
-                                    ))}
+                                    {availableMuscleGroups.map(g => {
+                                        const { finished, total } = getMuscleGroupCompletionStatus(g.value, displayedWeekIndex);
+                                        let bgStyle = "";
+                                        if (finished === 0) {
+                                            bgStyle = filterMuscleGroup === g.value 
+                                                ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-black' 
+                                                : 'bg-white border-zinc-200 text-zinc-500 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900';
+                                        } else if (finished === total) {
+                                            bgStyle = filterMuscleGroup === g.value
+                                                ? "bg-lime-500/40 text-lime-600 border-lime-500 dark:bg-lime-950/40 dark:text-lime-400 dark:border-lime-400 font-extrabold"
+                                                : "bg-lime-500/30 text-lime-600 border-lime-500/40 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-900/40";
+                                        } else if (finished === 1) {
+                                            bgStyle = filterMuscleGroup === g.value
+                                                ? "bg-red-500/40 text-red-600 border-red-500 dark:bg-red-950/40 dark:text-red-400 dark:border-red-400 font-extrabold"
+                                                : "bg-red-500/30 text-red-600 border-red-500/40 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40";
+                                        } else {
+                                            bgStyle = filterMuscleGroup === g.value
+                                                ? "bg-amber-500/40 text-amber-600 border-amber-500 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-400 font-extrabold"
+                                                : "bg-amber-500/30 text-amber-600 border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40";
+                                        }
+                                        return (
+                                            <button key={g.value} onClick={() => setFilterMuscleGroup(g.value)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${bgStyle}`}>{g.label}</button>
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2 snap-x">
                                     {filteredExercises.length === 0 ? (
                                         <div className="text-sm text-zinc-400 italic px-2">No exercises found for this filter.</div>
                                     ) : (
-                                        filteredExercises.map(ex => (
-                                            <button 
-                                                key={ex.id}
-                                                onClick={() => { setSelectedExerciseId(ex.id); setViewWeekOffset(0); }}
-                                                className={`snap-start shrink-0 w-[calc((100%-1.5rem)/3)] px-3 py-2 rounded-full border transition-all text-center flex flex-col items-center justify-center gap-1 shadow-sm ${
-                                                    selectedExerciseId === ex.id 
+                                        filteredExercises.map(ex => {
+                                            const isSelected = selectedExerciseId === ex.id;
+                                            const completedCount = getExerciseCompletionStatus(ex.id, displayedWeekIndex);
+                                            let bgStyle = "";
+                                            if (completedCount === 1) {
+                                                bgStyle = isSelected
+                                                    ? "bg-red-500/40 text-red-600 border-red-500 dark:bg-red-950/40 dark:text-red-400 dark:border-red-400 font-extrabold"
+                                                    : "bg-red-500/30 text-red-600 border-red-500/40 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40";
+                                            } else if (completedCount === 2) {
+                                                bgStyle = isSelected
+                                                    ? "bg-amber-500/40 text-amber-600 border-amber-500 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-400 font-extrabold"
+                                                    : "bg-amber-500/30 text-amber-600 border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40";
+                                            } else if (completedCount >= 3) {
+                                                bgStyle = isSelected
+                                                    ? "bg-lime-500/40 text-lime-600 border-lime-500 dark:bg-lime-950/40 dark:text-lime-400 dark:border-lime-400 font-extrabold"
+                                                    : "bg-lime-500/30 text-lime-600 border-lime-500/40 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-900/40";
+                                            } else {
+                                                bgStyle = isSelected 
                                                     ? 'border-zinc-900 bg-zinc-900 text-white dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-900' 
-                                                    : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700'
-                                                }`}
-                                            >
-                                                <span className="text-xs font-semibold truncate w-full">
-                                                    {ex.name}
-                                                </span>
-                                            </button>
-                                        ))
+                                                    : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700';
+                                            }
+                                            return (
+                                                <button 
+                                                    key={ex.id}
+                                                    onClick={() => { setSelectedExerciseId(ex.id); setViewWeekOffset(0); }}
+                                                    className={`snap-start shrink-0 w-[calc((100%-1.5rem)/3)] px-3 py-2 rounded-full border transition-all text-center flex flex-col items-center justify-center gap-1 shadow-sm ${bgStyle}`}
+                                                >
+                                                    <span className="text-xs font-semibold truncate w-full">
+                                                        {ex.name}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })
                                     )}
                                 </div>
 
@@ -1086,6 +1279,41 @@
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* FINISH WORKOUT SESSION BUTTON */}
+                                        <div className="mt-6">
+                                            {(() => {
+                                                const activeSessionIdx = getActiveSessionIndex(filterWorkoutIndex);
+                                                if (activeSessionIdx !== -1) {
+                                                    return (
+                                                        <Button 
+                                                            onClick={() => finishSession(activeSessionIdx)}
+                                                            className="w-full py-4 text-base font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                                                        >
+                                                            <Icons.CheckCircle2 className="h-5 w-5" />
+                                                            Finish Session {String.fromCharCode(65 + activeSessionIdx)}
+                                                        </Button>
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <div className="space-y-3">
+                                                            <div className="w-full py-4 text-base font-bold bg-green-600 text-white rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2">
+                                                                <Icons.Award className="h-5 w-5" />
+                                                                All Sessions Completed ✓
+                                                            </div>
+                                                            <Button 
+                                                                onClick={resetSessions}
+                                                                variant="outline"
+                                                                className="w-full py-3 text-sm font-semibold border-zinc-200 hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all"
+                                                            >
+                                                                <Icons.RotateCcw className="h-4 w-4" />
+                                                                Reset / Reopen Sessions
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                }
+                                            })()}
+                                        </div>
                                     </>
                                 )}
                                 
@@ -1117,20 +1345,20 @@
                         </div>
                     </Modal>
 
-                    <Modal isOpen={showSyncModal} onClose={() => setShowSyncModal(false)} title="Sync Conflict">
-                        <div className="space-y-4">
-                            <div className="p-3 bg-indigo-50 text-indigo-700 rounded-lg text-sm dark:bg-indigo-900/30 dark:text-indigo-300">We found existing data in your Cloud account.</div>
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400">Do you want to overwrite your local data with the Cloud backup, or overwrite the Cloud with your current local data?</p>
-                            <div className="flex flex-col gap-2">
-                                <Button onClick={() => handleConfirmSync(true)} className="w-full">Download from Cloud</Button>
-                                <Button onClick={() => handleConfirmSync(false)} variant="outline" className="w-full">Upload Local to Cloud</Button>
-                            </div>
-                        </div>
-                    </Modal>
-
                 {/* FLOATING TIMER (Sticky Footer) */}
                 {timerActive && restTimer > 0 && (
-                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-2xl border border-zinc-800 dark:border-zinc-200 animate-[slideIn_0.3s_ease-out] timer-active">
+                    <div 
+                        onMouseDown={handleDragStart}
+                        onTouchStart={handleDragStart}
+                        className={tempPosition 
+                            ? "fixed z-50 flex items-center gap-3 px-6 py-3 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-2xl border border-zinc-800 dark:border-zinc-200 timer-active select-none touch-none"
+                            : "fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-2xl border border-zinc-800 dark:border-zinc-200 animate-[slideIn_0.3s_ease-out] timer-active"
+                        }
+                        style={tempPosition 
+                            ? { left: `${tempPosition.x}px`, top: `${tempPosition.y}px`, bottom: 'auto', transform: 'none', cursor: 'grab' } 
+                            : { cursor: 'grab' }
+                        }
+                    >
                         <Icons.Timer className="h-5 w-5 animate-pulse" />
                         <span className="text-xl font-black tabular-nums tracking-wider">{formatTime(restTimer)}</span>
                     </div>
