@@ -1146,7 +1146,7 @@
                                             return (
                                                 <button 
                                                     key={ex.id}
-                                                    onClick={() => { setSelectedExerciseId(ex.id); setViewWeekOffset(0); }}
+                                                    onClick={() => { setSelectedExerciseId(ex.id); }}
                                                     className={`snap-start shrink-0 w-[calc((100%-1.5rem)/3)] px-3 py-2 rounded-full border transition-all text-center flex flex-col items-center justify-center gap-1 shadow-sm ${bgStyle}`}
                                                 >
                                                     <span className="text-xs font-semibold truncate w-full">
@@ -1191,14 +1191,22 @@
                                                                 const isDone = history[selectedExerciseId]?.[displayedWeekIndex]?.[wIdx]?.[sIdx];
                                                                 const currentReps = sessionData.reps[sIdx];
                                                                 let btnColor = "bg-zinc-100 text-zinc-300 dark:bg-zinc-800 dark:text-zinc-600";
+                                                                let rowStyle = "border-l-[3px] border-l-transparent transition-all duration-200";
                                                                 if (isDone) {
-                                                                    if (currentReps >= 10) btnColor = "bg-red-600 text-white shadow-lg shadow-red-600/30";
-                                                                    else if (currentReps === 9) btnColor = "bg-amber-600  text-white shadow-lg shadow-amber-600/30";
-                                                                    else btnColor = "bg-lime-600  text-white shadow-lg shadow-lime-600/30";
+                                                                    if (currentReps >= 10) {
+                                                                        btnColor = "bg-red-600 text-white shadow-lg shadow-red-600/30";
+                                                                        rowStyle = "bg-red-500/5 border-l-[3px] !border-l-red-500 dark:bg-red-500/10 dark:!border-l-red-400 transition-all duration-200";
+                                                                    } else if (currentReps === 9) {
+                                                                        btnColor = "bg-amber-600  text-white shadow-lg shadow-amber-600/30";
+                                                                        rowStyle = "bg-amber-500/5 border-l-[3px] !border-l-amber-500 dark:bg-amber-500/10 dark:!border-l-amber-400 transition-all duration-200";
+                                                                    } else {
+                                                                        btnColor = "bg-lime-600  text-white shadow-lg shadow-lime-600/30";
+                                                                        rowStyle = "bg-lime-500/5 border-l-[3px] !border-l-lime-500 dark:bg-lime-500/10 dark:!border-l-lime-400 transition-all duration-200";
+                                                                    }
                                                                 }
 
                                                                 return (
-                                                                    <div key={sIdx} className={`flex items-center justify-between px-5 py-3 ${isDone ? 'bg-zinc-50 dark:bg-zinc-900/30' : ''}`}>
+                                                                    <div key={sIdx} className={`flex items-center justify-between px-5 py-3 ${rowStyle}`}>
                                                                         <span className="text-xs font-bold text-zinc-400 w-8">#{sIdx+1}</span>
                                                                         <div className="flex items-baseline gap-1">
                                                                             <span className={`text-2xl font-black tracking-tighter ${
@@ -1226,7 +1234,7 @@
                                         </div>
 
                                         {/* STATS VISUALIZATION */}
-                                        <div className="mt-8 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all dark:border-zinc-700/50 dark:bg-zinc-900">
+                                        <div className="mt-8 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900/40 backdrop-blur-sm">
                                             <div className="p-6">
                                                 <div className="flex items-center justify-between mb-6">
                                                     <div className="flex items-center gap-3">
@@ -1265,10 +1273,10 @@
                                                 <div className="mt-6">
                                                     <div className="relative h-3 w-full rounded-full bg-zinc-100 dark:bg-zinc-800">
                                                         <div
-                                                            className="absolute inset-y-0 left-0 rounded-full bg-indigo-600 transition-all duration-1000 ease-out dark:bg-indigo-500"
+                                                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-1000 ease-out"
                                                             style={{ 
                                                                 width: `${progressionStats ? progressionStats.percent : 0}%`,
-                                                                boxShadow: '0 0 12px rgba(79, 70, 229, 0.4)' 
+                                                                boxShadow: '0 0 12px rgba(99, 102, 241, 0.4)' 
                                                             }}
                                                         />
                                                     </div>
@@ -1288,7 +1296,7 @@
                                                     return (
                                                         <Button 
                                                             onClick={() => finishSession(activeSessionIdx)}
-                                                            className="w-full py-4 text-base font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                                                            className="w-full py-4 text-base font-bold bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-0 shadow-md hover:scale-[1.01] transition-all transform active:scale-95 flex items-center justify-center gap-2"
                                                         >
                                                             <Icons.CheckCircle2 className="h-5 w-5" />
                                                             Finish Session {String.fromCharCode(65 + activeSessionIdx)}
@@ -1297,7 +1305,7 @@
                                                 } else {
                                                     return (
                                                         <div className="space-y-3">
-                                                            <div className="w-full py-4 text-base font-bold bg-green-600 text-white rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2">
+                                                            <div className="w-full py-4 text-base font-bold bg-gradient-to-r from-green-500/10 to-emerald-500/10 text-green-700 dark:text-green-400 border border-green-500/20 dark:border-green-500/10 rounded-xl shadow-sm flex items-center justify-center gap-2">
                                                                 <Icons.Award className="h-5 w-5" />
                                                                 All Sessions Completed ✓
                                                             </div>
