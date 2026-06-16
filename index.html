@@ -158,7 +158,7 @@
         
         window.saveUserData = async (uid, data) => {
             try {
-                await setDoc(doc(window.db, "users", uid), data, { merge: true });
+                await setDoc(doc(window.db, "users", uid), data);
                 console.log("Data synced to cloud");
             } catch (e) {
                 console.error("Error saving to cloud: ", e);
@@ -405,11 +405,14 @@
             );
         };
 
-        // --- LOGIC HELPERS ---
         const getWeekNumber = (start) => {
             if (!start) return 0;
-            const diff = new Date() - new Date(start);
-            return Math.floor(diff / (1000 * 60 * 60 * 24 * 7));
+            const [y, m, d] = start.split('-').map(Number);
+            const startLocal = new Date(y, m - 1, d);
+            const now = new Date();
+            const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const diffDays = Math.round((todayLocal - startLocal) / (1000 * 60 * 60 * 24));
+            return Math.max(0, Math.floor(diffDays / 7));
         };
 
 
@@ -603,26 +606,28 @@
                 document.addEventListener(isTouch ? 'touchend' : 'mouseup', onDragEnd);
             };
 
-            const runAutoSelect = (currentSettings, currentHistory) => {
-                if (!currentSettings || !currentSettings.workoutNames || currentSettings.workoutNames.length === 0) return;
+            const getGlobalNextWorkoutAndSession = (currentSettings, currentHistory, weekIdx) => {
+                if (!currentSettings || !currentSettings.workoutNames || currentSettings.workoutNames.length === 0) {
+                    return { workoutIdx: -1, sessionIdx: -1 };
+                }
                 const workoutsCount = parseInt(currentSettings.workoutsPerWeek) || 0;
-                const currentWeekIdx = getWeekNumber(currentSettings.startDate);
-                
-                let foundWorkoutIdx = -1;
                 for (let sIdx = 0; sIdx < workoutsCount; sIdx++) {
                     for (let rIdx = 0; rIdx < currentSettings.workoutNames.length; rIdx++) {
-                        const sessionHistory = currentHistory["_sessions"]?.[rIdx]?.[currentWeekIdx];
+                        const sessionHistory = currentHistory["_sessions"]?.[rIdx]?.[weekIdx];
                         const isCompleted = sessionHistory?.[sIdx] === true;
                         if (!isCompleted) {
-                            foundWorkoutIdx = rIdx;
-                            break;
+                            return { workoutIdx: rIdx, sessionIdx: sIdx };
                         }
                     }
-                    if (foundWorkoutIdx !== -1) break;
                 }
-                
-                if (foundWorkoutIdx !== -1) {
-                    setFilterWorkoutIndex(foundWorkoutIdx);
+                return { workoutIdx: -1, sessionIdx: -1 };
+            };
+
+            const runAutoSelect = (currentSettings, currentHistory) => {
+                const currentWeekIdx = getWeekNumber(currentSettings.startDate);
+                const next = getGlobalNextWorkoutAndSession(currentSettings, currentHistory, currentWeekIdx);
+                if (next.workoutIdx !== -1) {
+                    setFilterWorkoutIndex(next.workoutIdx);
                 } else {
                     setFilterWorkoutIndex(0);
                 }
@@ -852,7 +857,7 @@
 
             const toggleSetComplete = (weekIdx, workoutIdx, setIdx) => {
                 if (!selectedExerciseId) return;
-                const newHistory = { ...history };
+                const newHistory = JSON.parse(JSON.stringify(history));
                 if (!newHistory[selectedExerciseId]) newHistory[selectedExerciseId] = {};
                 if (!newHistory[selectedExerciseId][weekIdx]) newHistory[selectedExerciseId][weekIdx] = {};
                 if (!newHistory[selectedExerciseId][weekIdx][workoutIdx]) newHistory[selectedExerciseId][weekIdx][workoutIdx] = {};
@@ -940,8 +945,15 @@
                 return -1;
             };
 
+            const hasAnyCompletedSession = (workoutIdx) => {
+                const weekIdx = displayedWeekIndex;
+                const sessionHistory = history["_sessions"]?.[workoutIdx]?.[weekIdx];
+                if (!sessionHistory) return false;
+                return Object.values(sessionHistory).some(val => val === true);
+            };
+
             const finishSession = (wIdx) => {
-                const newHistory = { ...history };
+                const newHistory = JSON.parse(JSON.stringify(history));
                 if (!newHistory["_sessions"]) newHistory["_sessions"] = {};
                 if (!newHistory["_sessions"][filterWorkoutIndex]) newHistory["_sessions"][filterWorkoutIndex] = {};
                 if (!newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex]) newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex] = {};
@@ -949,14 +961,30 @@
                 newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex][wIdx] = true;
                 persistData(null, null, newHistory);
                 setNotification({ message: `Session ${String.fromCharCode(65 + wIdx)} finished successfully!`, type: 'success' });
+                
+                const next = getGlobalNextWorkoutAndSession(settings, newHistory, displayedWeekIndex);
+                if (next.workoutIdx !== -1) {
+                    setFilterWorkoutIndex(next.workoutIdx);
+                }
             };
 
             const resetSessions = () => {
-                const newHistory = { ...history };
+                const newHistory = JSON.parse(JSON.stringify(history));
+                let modified = false;
                 if (newHistory["_sessions"]?.[filterWorkoutIndex]?.[displayedWeekIndex]) {
                     delete newHistory["_sessions"][filterWorkoutIndex][displayedWeekIndex];
+                    modified = true;
+                }
+                const routineExs = exercises.filter(e => (e.assignedWorkout || 0) === parseInt(filterWorkoutIndex));
+                routineExs.forEach(ex => {
+                    if (newHistory[ex.id]?.[displayedWeekIndex]) {
+                        delete newHistory[ex.id][displayedWeekIndex];
+                        modified = true;
+                    }
+                });
+                if (modified) {
                     persistData(null, null, newHistory);
-                    setNotification({ message: 'Sessions reset successfully!', type: 'success' });
+                    setNotification({ message: 'Sessions and progress reset successfully!', type: 'success' });
                 }
             };
 
@@ -1445,35 +1473,72 @@
                                         {/* FINISH WORKOUT SESSION BUTTON */}
                                         <div className="mt-6">
                                             {(() => {
-                                                const activeSessionIdx = getActiveSessionIndex(filterWorkoutIndex);
-                                                if (activeSessionIdx !== -1) {
-                                                    return (
-                                                        <Button 
-                                                            onClick={() => finishSession(activeSessionIdx)}
-                                                            className="w-full py-4 text-base font-bold bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-0 shadow-md hover:scale-[1.01] transition-all transform active:scale-95 flex items-center justify-center gap-2"
-                                                        >
-                                                            <Icons.CheckCircle2 className="h-5 w-5" />
-                                                            Finish Session {String.fromCharCode(65 + activeSessionIdx)}
-                                                        </Button>
-                                                    );
-                                                } else {
-                                                    return (
-                                                        <div className="space-y-3">
-                                                            <div className="w-full py-4 text-base font-bold bg-gradient-to-r from-green-500/10 to-emerald-500/10 text-green-700 dark:text-green-400 border border-green-500/20 dark:border-green-500/10 rounded-xl shadow-sm flex items-center justify-center gap-2">
-                                                                <Icons.Award className="h-5 w-5" />
-                                                                All Sessions Completed ✓
+                                                const localActiveSessionIdx = getActiveSessionIndex(filterWorkoutIndex);
+                                                const next = getGlobalNextWorkoutAndSession(settings, history, displayedWeekIndex);
+                                                
+                                                const showRecommendation = next.workoutIdx !== -1 && next.workoutIdx !== parseInt(filterWorkoutIndex);
+                                                const targetName = showRecommendation ? (settings.workoutNames[next.workoutIdx] || `Workout ${next.workoutIdx + 1}`) : '';
+                                                
+                                                return (
+                                                    <div className="space-y-4">
+                                                        {showRecommendation && (
+                                                            <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 dark:border-indigo-500/10 dark:bg-indigo-500/5 flex items-center justify-between shadow-sm">
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Next Recommended Workout</span>
+                                                                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{targetName} (Session {String.fromCharCode(65 + next.sessionIdx)})</span>
+                                                                </div>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    onClick={() => {
+                                                                        setFilterWorkoutIndex(next.workoutIdx);
+                                                                        setFilterMuscleGroup('all');
+                                                                        setSelectedExerciseId(null);
+                                                                    }}
+                                                                    className="text-xs font-bold gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 px-3 py-1.5 h-auto bg-indigo-500/10 dark:bg-indigo-500/20 hover:bg-indigo-500/20 dark:hover:bg-indigo-500/30"
+                                                                >
+                                                                    Go <Icons.ChevronRight className="h-3.5 w-3.5" />
+                                                                </Button>
                                                             </div>
-                                                            <Button 
-                                                                onClick={resetSessions}
-                                                                variant="outline"
-                                                                className="w-full py-3 text-sm font-semibold border-zinc-200 hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all"
-                                                            >
-                                                                <Icons.RotateCcw className="h-4 w-4" />
-                                                                Reset / Reopen Sessions
-                                                            </Button>
-                                                        </div>
-                                                    );
-                                                }
+                                                        )}
+                                                        
+                                                        {localActiveSessionIdx === -1 ? (
+                                                            <div className="space-y-3">
+                                                                <div className="w-full py-4 text-base font-bold bg-gradient-to-r from-green-500/10 to-emerald-500/10 text-green-700 dark:text-green-400 border border-green-500/20 dark:border-green-500/10 rounded-xl shadow-sm flex items-center justify-center gap-2">
+                                                                    <Icons.Award className="h-5 w-5" />
+                                                                    All Sessions Completed ✓
+                                                                </div>
+                                                                <Button 
+                                                                    onClick={resetSessions}
+                                                                    variant="outline"
+                                                                    className="w-full py-3 text-sm font-semibold border-zinc-200 hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all"
+                                                                >
+                                                                    <Icons.RotateCcw className="h-4 w-4" />
+                                                                    Reset / Reopen Sessions
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-3">
+                                                                <Button 
+                                                                    onClick={() => finishSession(localActiveSessionIdx)}
+                                                                    className="w-full py-4 text-base font-bold bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 dark:border-0 shadow-md hover:scale-[1.01] transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                                                                >
+                                                                    <Icons.CheckCircle2 className="h-5 w-5" />
+                                                                    Finish Session {String.fromCharCode(65 + localActiveSessionIdx)}
+                                                                </Button>
+                                                                {hasAnyCompletedSession(filterWorkoutIndex) && (
+                                                                    <Button 
+                                                                        onClick={resetSessions}
+                                                                        variant="outline"
+                                                                        className="w-full py-2.5 text-xs font-semibold border-dashed border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 flex items-center justify-center gap-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-all"
+                                                                    >
+                                                                        <Icons.RotateCcw className="h-3 w-3" />
+                                                                        Reset {settings.workoutNames[filterWorkoutIndex]} Progress
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
                                             })()}
                                         </div>
                                     </>
